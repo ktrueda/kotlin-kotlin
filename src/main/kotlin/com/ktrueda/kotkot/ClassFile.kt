@@ -182,6 +182,9 @@ class ClassFile(
     val attributes: List<Attribute>
 ) {
     override fun toString(): String {
+        val methodsExp = methods.map { constantPools[it.nameIndex - 1] as ConstantPoolUtf8 }
+            .map { it.info.decodeToString() }
+            .joinToString { it }
         return """
             ## Class File ###
                 magic: ${magic}
@@ -203,6 +206,7 @@ class ClassFile(
             parse result
                 className: ${getThisClassName()}
                 superClass: ${getSuperClassName()}
+                methods: $methodsExp
             #################
         """.trimIndent()
     }
