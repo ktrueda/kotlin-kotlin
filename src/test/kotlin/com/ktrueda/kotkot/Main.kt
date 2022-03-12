@@ -1,16 +1,12 @@
+package com.ktrueda.kotkot
 
 import java.io.File
-import java.util.concurrent.Executors
 
-
-class Main {
-}
 fun main(){
-    val command = "pwd"
-    ProcessBuilder().command(command)
+    // run kotlinc
+    ProcessBuilder().command(listOf("sh", "build.sh"))
+        .directory(File("./src/test/resources"))
         .redirectOutput(ProcessBuilder.Redirect.INHERIT)
         .redirectError(ProcessBuilder.Redirect.INHERIT)
         .start();
-
-    print("hello world")
 }
