@@ -23,20 +23,21 @@ fun RandomAccessFile.read(n: Int): ByteArray {
     return ba
 }
 
-open class ConstantPool() {
+open class ConstantPool {
     var type: Int = 0
 
-    constructor(randomAccessFile: RandomAccessFile) : this() {
-        this.type = randomAccessFile.read()
-        when (type) {
-            1 -> ConstantPoolUtf8(randomAccessFile)
-            3 -> ConstantPoolInteger(randomAccessFile)
-            7 -> ConstantPoolClass(randomAccessFile)
-            8 -> ConstantPoolString(randomAccessFile)
-            9 -> ConstantPoolFieldRef(randomAccessFile)
-            10 -> ConstantPoolMethodRef(randomAccessFile)
-            12 -> ConstantPoolNameAndType(randomAccessFile)
-            else -> throw RuntimeException("Not implemented constant pool type $type")
+    companion object {
+        fun load(randomAccessFile: RandomAccessFile): ConstantPool {
+            return when (val type = randomAccessFile.read()) {
+                1 -> ConstantPoolUtf8(randomAccessFile)
+                3 -> ConstantPoolInteger(randomAccessFile)
+                7 -> ConstantPoolClass(randomAccessFile)
+                8 -> ConstantPoolString(randomAccessFile)
+                9 -> ConstantPoolFieldRef(randomAccessFile)
+                10 -> ConstantPoolMethodRef(randomAccessFile)
+                12 -> ConstantPoolNameAndType(randomAccessFile)
+                else -> throw RuntimeException("Not implemented constant pool type $type")
+            }
         }
     }
 
@@ -198,8 +199,24 @@ class ClassFile(
                 methods: (omitted)
                 attributesCount: $attributesCount
                 attributes: (omitted)
+                
+            parse result
+                className: ${getThisClassName()}
+                superClass: ${getSuperClassName()}
             #################
         """.trimIndent()
+    }
+
+    private fun getThisClassName(): String {
+        val constantPoolClass = constantPools[thisClass - 1] as ConstantPoolClass
+        val constantPoolUtf8 = constantPools[constantPoolClass.nameIndex - 1] as ConstantPoolUtf8
+        return constantPoolUtf8.info.decodeToString()
+    }
+
+    private fun getSuperClassName(): String {
+        val constantPoolClass = constantPools[superClass - 1] as ConstantPoolClass
+        val constantPoolUtf8 = constantPools[constantPoolClass.nameIndex - 1] as ConstantPoolUtf8
+        return constantPoolUtf8.info.decodeToString()
     }
 
     companion object {
@@ -210,7 +227,7 @@ class ClassFile(
             val majorVersion = raf.read(2).toInt()
             val constantPoolCount = raf.read(2).toInt() - 1
             val constantPools = List(constantPoolCount) {
-                val cp = ConstantPool(raf)
+                val cp = ConstantPool.load(raf)
                 cp
             }
             val accessFlags = raf.read(2).toInt()
