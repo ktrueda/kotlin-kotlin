@@ -1,3 +1,3 @@
 set -exu
 cd ../../../target/src
-kotlinc *.kt
+kotlinc -jvm-target 1.8 *.kt

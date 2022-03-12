@@ -11,7 +11,7 @@ fun Int.pow(n: Int): Int = if (n == 0) 1 else n * this.pow(n - 1)
 
 fun ByteArray.toInt(): Int {
     return List(this.size) {
-        255.pow(it) * this[it]
+        255.pow(it) * this[this.size - it - 1] // overflow
     }.sum()
 }
 
@@ -115,21 +115,89 @@ class ConstantPoolNameAndType : ConstantPool {
     }
 }
 
+class Field(randomAccessFile: RandomAccessFile) {
+    val accessFlag: Int
+    val nameIndex: Int
+    val descriptorIndex: Int
+    val attributesCount: Int
+    val attributes: List<Attribute>
+
+    init {
+        accessFlag = randomAccessFile.read(2).toInt()
+        nameIndex = randomAccessFile.read(2).toInt()
+        descriptorIndex = randomAccessFile.read(2).toInt()
+        attributesCount = randomAccessFile.read(2).toInt()
+        attributes = List(attributesCount) {
+            Attribute(randomAccessFile)
+        }
+    }
+}
+
+class Method(randomAccessFile: RandomAccessFile) {
+    val accessFlag: Int
+    val nameIndex: Int
+    val descriptorIndex: Int
+    val attributesCount: Int
+    val attributes: List<Attribute>
+
+    init {
+        accessFlag = randomAccessFile.read(2).toInt()
+        nameIndex = randomAccessFile.read(2).toInt()
+        descriptorIndex = randomAccessFile.read(2).toInt()
+        attributesCount = randomAccessFile.read(2).toInt()
+        attributes = List(attributesCount) {
+            Attribute(randomAccessFile)
+        }
+    }
+}
+
+class Attribute(randomAccessFile: RandomAccessFile) {
+    val attributeNameIndex: Int
+    val attributeLength: Int
+    val info: ByteArray
+
+    init {
+        attributeNameIndex = randomAccessFile.read(2).toInt()
+        attributeLength = randomAccessFile.read(4).toInt()
+        info = randomAccessFile.read(attributeLength)
+    }
+}
+
 class ClassFile(
     val magic: String,
     val minorVersion: Int,
     val majorVersion: Int,
     val constantPoolCount: Int,
-    val constantPools: List<ConstantPool>
+    val constantPools: List<ConstantPool>,
+    val accessFlags: Int,
+    val thisClass: Int,
+    val superClass: Int,
+    val interfacesCount: Int,
+    val fieldsCount: Int,
+    val fields: List<Field>,
+    val methodsCount: Int,
+    val methods: List<Method>,
+    val attributesCount: Int,
+    val attributes: List<Attribute>
 ) {
     override fun toString(): String {
         return """
             ## Class File ###
-            magic: ${magic}
-            minorVersion: $minorVersion
-            majorVersion: $majorVersion
-            constantPoolCount: $constantPoolCount
-            constantPools: (omitted)
+                magic: ${magic}
+                minorVersion: $minorVersion
+                majorVersion: $majorVersion
+                constantPoolCount: $constantPoolCount
+                constantPools: (omitted)
+                accessFlag: $accessFlags
+                thisClass: $thisClass
+                superClass: $superClass
+                interfacesCount: $interfacesCount
+                fieldsCount: $fieldsCount
+                fields: (omitted)
+                methodsCount: $methodsCount
+                methods: (omitted)
+                attributesCount: $attributesCount
+                attributes: (omitted)
             #################
         """.trimIndent()
     }
@@ -143,11 +211,44 @@ class ClassFile(
             val constantPoolCount = raf.read(2).toInt() - 1
             val constantPools = List(constantPoolCount) {
                 val cp = ConstantPool(raf)
-//                println("read constant pool $cp")
                 cp
             }
+            val accessFlags = raf.read(2).toInt()
+            val thisClass = raf.read(2).toInt()
+            val superClass = raf.read(2).toInt()
+            val interfacesCount = raf.read(2).toInt()
+            // skip interface
+            val fieldsCount = raf.read(2).toInt()
+            val fields = List(fieldsCount) {
+                Field(raf)
+            }
+            val methodsCount = raf.read(2).toInt()
+            val methods = List(methodsCount) {
+                Method(raf)
+            }
+            val attributeCount = raf.read(2).toInt()
+            val attributes = List(attributeCount) {
+                Attribute(raf)
+            }
 
-            return ClassFile(magic, minorVersion, majorVersion, constantPoolCount, constantPools)
+
+            return ClassFile(
+                magic,
+                minorVersion,
+                majorVersion,
+                constantPoolCount,
+                constantPools,
+                accessFlags,
+                thisClass,
+                superClass,
+                interfacesCount,
+                fieldsCount,
+                fields,
+                methodsCount,
+                methods,
+                attributeCount,
+                attributes
+            )
         }
     }
 
