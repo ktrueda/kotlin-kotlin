@@ -10,21 +10,17 @@ import java.io.File
 import kotlin.streams.asStream
 
 
-val skipCompile = true
-
 class MainTest {
 
     companion object {
         @BeforeAll
         fun compile() {
-            if (!skipCompile) {
-                ProcessBuilder().command(listOf("sh", "build.sh"))
-                    .directory(File("./src/test/resources"))
-                    .redirectOutput(ProcessBuilder.Redirect.INHERIT)
-                    .redirectError(ProcessBuilder.Redirect.INHERIT)
-                    .start()
-                    .waitFor();
-            }
+            ProcessBuilder().command(listOf("sh", "build.sh"))
+                .directory(File("./src/test/resources"))
+                .redirectOutput(ProcessBuilder.Redirect.INHERIT)
+                .redirectError(ProcessBuilder.Redirect.INHERIT)
+                .start()
+                .waitFor();
         }
     }
 
