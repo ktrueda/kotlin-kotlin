@@ -2,7 +2,10 @@ package com.ktrueda.kotkot
 
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.DynamicTest
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestFactory
+import org.junit.jupiter.api.condition.EnabledOnOs
+import org.junit.jupiter.api.condition.OS
 import java.io.File
 import kotlin.streams.asStream
 
@@ -37,4 +40,12 @@ class MainTest {
                 executor.runMain()
             }
         }.asStream()
+
+    @Test
+    @EnabledOnOs(OS.MAC)
+    fun dev() {
+        val cf: ClassFile = ClassFile.load(File("./target/src/MathKt.class"))
+        val executor = Executor(cf)
+        executor.runMain()
+    }
 }
