@@ -3,7 +3,7 @@ package com.ktrueda.kotkot
 import org.junit.jupiter.api.Test
 import java.io.File
 
-val skipCompile = false
+val skipCompile = true
 
 class MainTest {
     @Test
@@ -18,8 +18,14 @@ class MainTest {
                 .waitFor();
         }
 
-        val cf: ClassFile = ClassFile.load(File("./target/src/HelloWorldKt.class"))
-        val executor = Executor(cf)
-        executor.runMain()
+        File("./target/src/").walk()
+            .map { it.toPath() }
+            .filter { it.toAbsolutePath().toString().endsWith(".kt") }
+            .map { it.fileName.toString().split('.')[0] }
+            .forEach {
+                val cf: ClassFile = ClassFile.load(File("./target/src/${it}Kt.class"))
+                val executor = Executor(cf)
+                executor.runMain()
+            }
     }
 }
