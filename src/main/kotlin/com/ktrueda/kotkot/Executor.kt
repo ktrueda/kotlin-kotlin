@@ -33,7 +33,9 @@ class Frame(private val classFile: ClassFile, private val code: Code) {
                 """.trimIndent()
             )
             val nextFrame = when (opCode) {
+                0x5 -> iconst(2, inputStream)
                 0x6 -> iconst(3, inputStream)
+                0x10 -> bipush(inputStream)
                 0x12 -> ldc(inputStream)
                 0x1a -> iload(0, inputStream)
                 0x3b -> istore(0, inputStream)
@@ -57,6 +59,12 @@ class Frame(private val classFile: ClassFile, private val code: Code) {
     //0x6
     private fun iconst(n: Int, inputStream: ByteArrayInputStream): Frame? {
         operandStack.push(n)
+        return null
+    }
+
+    //0x10
+    private fun bipush(inputStream: ByteArrayInputStream): Frame? {
+        operandStack.push(inputStream.read())
         return null
     }
 
