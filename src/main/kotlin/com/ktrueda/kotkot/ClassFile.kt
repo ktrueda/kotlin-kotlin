@@ -1,5 +1,7 @@
 package com.ktrueda.kotkot
 
+import java.io.DataInput
+import java.io.DataInputStream
 import java.io.File
 import java.io.RandomAccessFile
 
@@ -15,7 +17,7 @@ fun ByteArray.toInt(): Int {
     }.sum()
 }
 
-fun RandomAccessFile.read(n: Int): ByteArray {
+fun DataInput.read(n: Int): ByteArray {
     val ba = ByteArray(n)
     repeat(n) {
         ba[it] = this.readByte()
@@ -152,6 +154,31 @@ class Method(randomAccessFile: RandomAccessFile) {
     }
 }
 
+class Code(input: DataInput) {
+    val maxStack: Int
+    val maxLocals: Int
+    val codeLength: Int
+    val binaryCode: ByteArray
+
+    init {
+        maxStack = input.read(2).toInt()
+        maxLocals = input.read(2).toInt()
+        codeLength = input.read(4).toInt()
+        binaryCode = input.read(codeLength)
+    }
+
+    override fun toString(): String {
+        return """
+            ## Code #######
+            maxStack: $maxStack
+            maxLocals: $maxLocals
+            codeLength: $codeLength
+            code: ${binaryCode.toHex()}
+            ###############
+        """.trimIndent()
+    }
+}
+
 class Attribute(randomAccessFile: RandomAccessFile) {
     val attributeNameIndex: Int
     val attributeLength: Int
@@ -222,6 +249,20 @@ class ClassFile(
         val constantPoolUtf8 = constantPools[constantPoolClass.nameIndex - 1] as ConstantPoolUtf8
         return constantPoolUtf8.info.decodeToString()
     }
+
+    fun findMethod(methodName: String): Method? {
+        return methods.find { (constantPools[it.nameIndex - 1] as ConstantPoolUtf8).info.decodeToString() == methodName }
+    }
+
+    fun getBinaryCode(method: Method): Code? {
+        val codeAttr = method.attributes.find {
+            val attrName = constantPools[it.attributeNameIndex - 1] as ConstantPoolUtf8
+            attrName.info.decodeToString() == "Code"
+        }!!
+
+        return Code(DataInputStream(codeAttr.info.inputStream()))
+    }
+
 
     companion object {
         fun load(path: File): ClassFile {

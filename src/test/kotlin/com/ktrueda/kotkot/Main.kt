@@ -3,9 +3,9 @@ package com.ktrueda.kotkot
 import java.io.File
 
 val skipCompile = true
-fun main(){
+fun main() {
     // run kotlinc
-    if(!skipCompile){
+    if (!skipCompile) {
         ProcessBuilder().command(listOf("sh", "build.sh"))
             .directory(File("./src/test/resources"))
             .redirectOutput(ProcessBuilder.Redirect.INHERIT)
@@ -14,6 +14,7 @@ fun main(){
             .waitFor();
     }
 
-    val cf :ClassFile = ClassFile.load(File("./target/src/HelloWorldKt.class"))
-    print(cf)
+    val cf: ClassFile = ClassFile.load(File("./target/src/HelloWorldKt.class"))
+    val executor = Executor(cf)
+    executor.runMain()
 }
