@@ -30,6 +30,7 @@ private fun ByteArray.myInputStream(): MyByteArrayInputStream {
 }
 
 class Frame(
+    private val classLoader: MyClassLoader,
     private val classFile: ClassFile,
     private val code: Code,
     private var localVariables: Array<Any>
@@ -224,6 +225,7 @@ class Frame(
         val methodNameUtf8 = classFile.constantPools[cpNameAndType.nameIndex - 1] as ConstantPoolUtf8
         val methodName = methodNameUtf8.info.decodeToString()
         val methodArgsExpUtf8 = classFile.constantPools[cpNameAndType.descriptorIndex - 1] as ConstantPoolUtf8
+        val methodDescriptor = methodArgsExpUtf8.info.decodeToString()
 
         logger.debug("$className.${methodName} ${methodArgsExpUtf8.info.decodeToString()}")
 
@@ -234,10 +236,13 @@ class Frame(
 
         if (className == "java/io/PrintStream") {
             println(args[args.size - 1])//TODO
+            return null
         } else {
-            TODO()
+            val classFile = classLoader.get(className) ?: throw RuntimeException("class not found")
+            val method = classFile.findMethod(methodName, methodDescriptor)!![0]
+            val frame = Frame(classLoader, classFile, classFile.getBinaryCode(method)!!, args.toTypedArray())
+            return frame
         }
-        return null
     }
 
     //0xb8
@@ -274,13 +279,18 @@ class Frame(
         } else {
             listOf(operandStack.pop()) //TODO
         }
-        return Frame(classFile, targetCode, args.toTypedArray())
+        return Frame(classLoader, classFile, targetCode, args.toTypedArray())
     }
 }
 
-class Executor(private val classFile: ClassFile) {
+class Executor(
+    private val classLoader: MyClassLoader,
+    private val mainClass: String
+) {
+    private val classFile: ClassFile = classLoader.get(mainClass) ?: throw RuntimeException("class not found")
     private val logger = KotlinLogging.logger {}
     private val frameStack = Stack<Frame>()
+
     fun runMain() {
         val mainMethod = classFile.findMethod("main", "([Ljava/lang/String;)V")
         if (mainMethod.isEmpty()) {
@@ -288,7 +298,7 @@ class Executor(private val classFile: ClassFile) {
         }
         val mainMethodCode =
             classFile.getBinaryCode(mainMethod[0]) ?: throw RuntimeException("main method Code not found")
-        val firstFrame = Frame(classFile, mainMethodCode, Array<Any>(0) {})
+        val firstFrame = Frame(classLoader, classFile, mainMethodCode, Array<Any>(0) {})
         frameStack.push(firstFrame)
 
         while (!frameStack.isEmpty()) {

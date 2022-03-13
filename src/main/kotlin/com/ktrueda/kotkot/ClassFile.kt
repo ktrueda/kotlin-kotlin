@@ -324,10 +324,15 @@ class ClassFile(
 
 class MyClassLoader private constructor(private val map: Map<String, ClassFile>) {
 
+    fun get(className: String): ClassFile? = map[className]
+
+    fun allClasses() = map.keys
+
+
     companion object {
         fun load(path: File): MyClassLoader {
             val map = path.walk()
-                .filter { it.toPath().toAbsolutePath().endsWith(".class") }
+                .filter { it.toPath().toAbsolutePath().toString().endsWith(".class") }
                 .map {
                     val className = it.toPath().fileName.toString().split('.')[0]
                     className to ClassFile.load(it)
