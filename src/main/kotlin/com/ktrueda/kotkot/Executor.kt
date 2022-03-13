@@ -32,11 +32,12 @@ private fun ByteArray.myInputStream(): MyByteArrayInputStream {
 class Frame(
     private val classLoader: MyClassLoader,
     private val classFile: ClassFile,
-    private val code: Code,
+    private val method: Method,
     private var localVariables: Array<Any>
 ) {
     private val logger = KotlinLogging.logger {}
     val operandStack = Stack<Any>()
+    val code: Code = classFile.getBinaryCode(method) ?: throw RuntimeException()
     private val inputStream: MyByteArrayInputStream = code.binaryCode.myInputStream()
 
     fun run(): Any? {
@@ -44,7 +45,9 @@ class Frame(
         logger.info(
             """
             ############## frame created/resumed ########
-            ${code.binaryCode.toHex()}
+            frameHash: ${code.binaryCode.toHex()}
+            class: ${classFile.getThisClassName()}
+            method: ${(classFile.constantPools[method.nameIndex - 1] as ConstantPoolUtf8).info.decodeToString()}
             currentPos: ${inputStream.getPos()}
             ############################################
         """.trimIndent()
@@ -63,6 +66,7 @@ class Frame(
                 """.trimIndent()
             )
             val nextFrame = when (opCode) {
+                0x1 -> aconstnull(inputStream)
                 0x4 -> iconst(1, inputStream)
                 0x5 -> iconst(2, inputStream)
                 0x6 -> iconst(3, inputStream)
@@ -70,6 +74,7 @@ class Frame(
                 0x10 -> bipush(inputStream)
                 0x12 -> ldc(inputStream)
                 0x1a -> iload(0, inputStream)
+                0x1c -> iload(2, inputStream)
                 0x3b -> istore(0, inputStream)
                 0x60 -> iadd(inputStream)
                 0x64 -> isub(inputStream)
@@ -95,6 +100,11 @@ class Frame(
         return null
     }
 
+    //0x1
+    private fun aconstnull(inputStream: ByteArrayInputStream): Frame? {
+        operandStack.push(null)
+        return null
+    }
 
     //0x4, 0x5, 0x6, 0x7
     private fun iconst(n: Int, inputStream: ByteArrayInputStream): Frame? {
@@ -240,7 +250,7 @@ class Frame(
         } else {
             val classFile = classLoader.get(className) ?: throw RuntimeException("class not found")
             val method = classFile.findMethod(methodName, methodDescriptor)!![0]
-            val frame = Frame(classLoader, classFile, classFile.getBinaryCode(method)!!, args.toTypedArray())
+            val frame = Frame(classLoader, classFile, method, args.toTypedArray())
             return frame
         }
     }
@@ -263,15 +273,12 @@ class Frame(
         val methodDescriptorUtf8 = classFile.constantPools[cpMethod.descriptorIndex - 1] as ConstantPoolUtf8
         val methodDescriptor = methodDescriptorUtf8.info.decodeToString()
 
-        assert(className == classFile.getThisClassName())//TODO
 
-        val foundMethods = classFile.findMethod(methodName, methodDescriptor)
+        val targetClassFile = classLoader.get(className) ?: throw RuntimeException("Class not found")
+        val foundMethods = targetClassFile.findMethod(methodName, methodDescriptor)
         if (foundMethods.isEmpty()) {
             throw RuntimeException("$methodName $methodDescriptor not found")
         }
-
-        val targetCode = classFile.getBinaryCode(foundMethods[0])
-            ?: throw RuntimeException("$methodName $methodDescriptor not found")//TODO
 
         logger.debug("desciptor $methodDescriptor")
         val args = if (methodDescriptor == "()V") {//TODO
@@ -279,7 +286,9 @@ class Frame(
         } else {
             listOf(operandStack.pop()) //TODO
         }
-        return Frame(classLoader, classFile, targetCode, args.toTypedArray())
+
+        val frame = Frame(classLoader, targetClassFile, foundMethods[0], args.toTypedArray())
+        return frame
     }
 }
 
@@ -296,9 +305,7 @@ class Executor(
         if (mainMethod.isEmpty()) {
             throw RuntimeException("main method not found")
         }
-        val mainMethodCode =
-            classFile.getBinaryCode(mainMethod[0]) ?: throw RuntimeException("main method Code not found")
-        val firstFrame = Frame(classLoader, classFile, mainMethodCode, Array<Any>(0) {})
+        val firstFrame = Frame(classLoader, classFile, mainMethod[0], Array<Any>(0) {})
         frameStack.push(firstFrame)
 
         while (!frameStack.isEmpty()) {

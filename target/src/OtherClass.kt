@@ -1,9 +1,10 @@
 fun main() {
     Printer.greetings()
+    Printer.greetings("tom")
 }
 
 object Printer {
-    fun greetings() {
-        println("hello")
+    fun greetings(name: String = "jeff") {
+        println("hello $name")
     }
 }
