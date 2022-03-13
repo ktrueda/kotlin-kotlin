@@ -12,20 +12,16 @@ private fun ByteArrayInputStream.read(n: Int): ByteArray {
     return ba
 }
 
-val standardLib = mapOf(
-    "java/io/PrintStream" to mapOf(
-        "out" to fun(obj: Any): Unit {
-            println(obj)
-        }
-    )
-)
-
 class Executor(private val classFile: ClassFile) {
     private val logger = KotlinLogging.logger {}
     private val stack = Stack<Any>()
     fun runMain() {
-        val mainMethod = classFile.findMethod("main") ?: throw RuntimeException("main method not found")
-        val mainMethodCode = classFile.getBinaryCode(mainMethod) ?: throw RuntimeException("main method Code not found")
+        val mainMethod = classFile.findMethod("main", "([Ljava/lang/String;)V")
+        if (mainMethod.isEmpty()) {
+            throw RuntimeException("main method not found")
+        }
+        val mainMethodCode =
+            classFile.getBinaryCode(mainMethod[0]) ?: throw RuntimeException("main method Code not found")
         logger.debug("mainMethodCode $mainMethodCode")
         run(mainMethodCode)
     }
@@ -50,10 +46,12 @@ class Executor(private val classFile: ClassFile) {
                     return
                 }
                 0xb6 -> invokevirtual(inputStream)
+                0xb8 -> invokestatic(inputStream)
                 else -> throw RuntimeException("Not-implemented opcode $opCode")
             }
         }
     }
+
 
     //0x12
     private fun ldc(inputStream: ByteArrayInputStream) {
@@ -120,5 +118,33 @@ class Executor(private val classFile: ClassFile) {
         } else {
             TODO()
         }
+    }
+
+    //0xb8
+    private fun invokestatic(inputStream: ByteArrayInputStream) {
+        val indexByte1 = inputStream.read()
+        val indexByte2 = inputStream.read()
+        val index = indexByte1 * 255 + indexByte2
+
+        val cpMethodRef = classFile.constantPools[index - 1] as ConstantPoolMethodRef
+
+        val cpClass = classFile.constantPools[cpMethodRef.classIndex - 1] as ConstantPoolClass
+        val cpNameUtf8 = classFile.constantPools[cpClass.nameIndex - 1] as ConstantPoolUtf8
+        val className = cpNameUtf8.info.decodeToString()
+
+        val cpMethod = classFile.constantPools[cpMethodRef.nameAndTypeIndex - 1] as ConstantPoolNameAndType
+        val cpMethodUtf8 = classFile.constantPools[cpMethod.nameIndex - 1] as ConstantPoolUtf8
+        val methodName = cpMethodUtf8.info.decodeToString()
+        val methodDescriptorUtf8 = classFile.constantPools[cpMethod.descriptorIndex - 1] as ConstantPoolUtf8
+        val methodDescriptor = methodDescriptorUtf8.info.decodeToString()
+
+        assert(className == classFile.getThisClassName())//TODO
+
+        val foundMethods = classFile.findMethod(methodName, methodDescriptor)
+        if (foundMethods.isEmpty()) {
+            throw RuntimeException("$methodName $methodDescriptor not found")
+        }
+
+        val targetCode = classFile.getBinaryCode(foundMethods[0])//TODO
     }
 }

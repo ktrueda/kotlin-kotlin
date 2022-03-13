@@ -238,7 +238,7 @@ class ClassFile(
         """.trimIndent()
     }
 
-    private fun getThisClassName(): String {
+    fun getThisClassName(): String {
         val constantPoolClass = constantPools[thisClass - 1] as ConstantPoolClass
         val constantPoolUtf8 = constantPools[constantPoolClass.nameIndex - 1] as ConstantPoolUtf8
         return constantPoolUtf8.info.decodeToString()
@@ -250,8 +250,16 @@ class ClassFile(
         return constantPoolUtf8.info.decodeToString()
     }
 
-    fun findMethod(methodName: String): Method? {
-        return methods.find { (constantPools[it.nameIndex - 1] as ConstantPoolUtf8).info.decodeToString() == methodName }
+    fun findMethod(methodName: String, methodDescriptor: String): List<Method> {
+        return methods
+            .filter {
+                val cpNameUtf8 = constantPools[it.nameIndex - 1] as ConstantPoolUtf8
+                cpNameUtf8.info.decodeToString() == methodName
+            }
+            .filter {
+                val cpDescriptorUtf8 = constantPools[it.descriptorIndex - 1] as ConstantPoolUtf8
+                cpDescriptorUtf8.info.decodeToString() == methodDescriptor
+            }
     }
 
     fun getBinaryCode(method: Method): Code? {
