@@ -13,4 +13,15 @@ dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib"
     implementation 'io.github.microutils:kotlin-logging-jvm:2.0.11'
     implementation group: 'ch.qos.logback', name: 'logback-classic', version: '1.2.6'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.5.2'
+}
+
+test {
+    useJUnitPlatform()
+
+    testLogging {
+        showStandardStreams true
+        events 'started', 'skipped', 'passed', 'failed'
+        exceptionFormat 'full'
+    }
 }
