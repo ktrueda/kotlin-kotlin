@@ -13,6 +13,7 @@ import kotlin.streams.asStream
 class MainTest {
 
     companion object {
+        @JvmStatic
         @BeforeAll
         fun compile() {
             ProcessBuilder().command(listOf("sh", "build.sh"))
