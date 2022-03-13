@@ -12,63 +12,62 @@ private fun ByteArrayInputStream.read(n: Int): ByteArray {
     return ba
 }
 
-class Executor(private val classFile: ClassFile) {
+class Frame(private val classFile: ClassFile, private val code: Code) {
     private val logger = KotlinLogging.logger {}
-    private val stack = Stack<Any>()
-    fun runMain() {
-        val mainMethod = classFile.findMethod("main", "([Ljava/lang/String;)V")
-        if (mainMethod.isEmpty()) {
-            throw RuntimeException("main method not found")
-        }
-        val mainMethodCode =
-            classFile.getBinaryCode(mainMethod[0]) ?: throw RuntimeException("main method Code not found")
-        logger.debug("mainMethodCode $mainMethodCode")
-        run(mainMethodCode)
-    }
+    private val opeRandStack = Stack<Any>()
+    private val inputStream: ByteArrayInputStream = code.binaryCode.inputStream()
 
-    private fun run(code: Code) {
-        val inputStream = code.binaryCode.inputStream()
+    fun run(): Frame? {
+        inputStream.reset()
         while (true) {
             val opCode = inputStream.read()
             logger.info(
                 """
                 ####### new  op code ###########
-                opCode: $opCode
-                stack: $stack
+                frame: ${this.hashCode()}
+                opCode: ${Integer.toHexString(opCode)}
+                stack: $opeRandStack
                 ################################
                 """.trimIndent()
             )
-            when (opCode) {
+            val nextFrame = when (opCode) {
                 0x12 -> ldc(inputStream)
                 0xb2 -> getstatic(inputStream)
                 0xb1 -> {
                     _return(inputStream)
-                    return
+                    return@run null
                 }
                 0xb6 -> invokevirtual(inputStream)
                 0xb8 -> invokestatic(inputStream)
                 else -> throw RuntimeException("Not-implemented opcode $opCode")
             }
+            if (nextFrame != null) {
+                inputStream.mark(1)
+                return nextFrame;
+            }
         }
+        return null
     }
 
 
     //0x12
-    private fun ldc(inputStream: ByteArrayInputStream) {
+    private fun ldc(inputStream: ByteArrayInputStream): Frame? {
+        logger.info("OPCODE: ldc")
         val cpIndex = inputStream.read(1).toInt()
         val cp = classFile.constantPools[cpIndex - 1]
         if (cp is ConstantPoolString) {
             val cpUtf8 = classFile.constantPools[cp.stringIndex - 1] as ConstantPoolUtf8
-            stack.push(cpUtf8.info.decodeToString())
+            opeRandStack.push(cpUtf8.info.decodeToString())
         } else if (cp is ConstantPoolInteger) {
-            stack.push(cp.value)
+            opeRandStack.push(cp.value)
         } else {
             throw RuntimeException("Unknown")
         }
+        return null
     }
 
     //0xb2
-    private fun getstatic(inputStream: ByteArrayInputStream) {
+    private fun getstatic(inputStream: ByteArrayInputStream): Frame? {
         logger.info("OPCODE: getstatic")
         val poolIndex = inputStream.read(2).toInt()
         val cpFieldRef = classFile.constantPools[poolIndex - 1] as ConstantPoolFieldRef
@@ -83,16 +82,18 @@ class Executor(private val classFile: ClassFile) {
 
         logger.debug("$className.$methodName")
 
-        stack.push("$className.$methodName")
+        opeRandStack.push("$className.$methodName")
+        return null
     }
 
     //0xb1
-    private fun _return(inputStream: ByteArrayInputStream) {
+    private fun _return(inputStream: ByteArrayInputStream): Frame? {
 
+        return null
     }
 
     //0xb6
-    private fun invokevirtual(inputStream: ByteArrayInputStream) {
+    private fun invokevirtual(inputStream: ByteArrayInputStream): Frame? {
         logger.info("OPCODE: invokevirtual")
         val cpIndex = inputStream.read(2).toInt()
 
@@ -110,7 +111,7 @@ class Executor(private val classFile: ClassFile) {
 
         val args = mutableListOf<Any>()
         repeat(1) {//TODO
-            args.add(stack.pop())
+            args.add(opeRandStack.pop())
         }
 
         if (className == "java/io/PrintStream") {
@@ -118,10 +119,11 @@ class Executor(private val classFile: ClassFile) {
         } else {
             TODO()
         }
+        return null
     }
 
     //0xb8
-    private fun invokestatic(inputStream: ByteArrayInputStream) {
+    private fun invokestatic(inputStream: ByteArrayInputStream): Frame? {
         val indexByte1 = inputStream.read()
         val indexByte2 = inputStream.read()
         val index = indexByte1 * 255 + indexByte2
@@ -145,6 +147,37 @@ class Executor(private val classFile: ClassFile) {
             throw RuntimeException("$methodName $methodDescriptor not found")
         }
 
-        val targetCode = classFile.getBinaryCode(foundMethods[0])//TODO
+        val targetCode = classFile.getBinaryCode(foundMethods[0])
+            ?: throw RuntimeException("$methodName $methodDescriptor not found")//TODO
+        return Frame(classFile, targetCode)
     }
+}
+
+class Executor(private val classFile: ClassFile) {
+    private val logger = KotlinLogging.logger {}
+    private val opeRandStack = Stack<Any>()
+    private val frameStack = Stack<Frame>()
+    fun runMain() {
+        val mainMethod = classFile.findMethod("main", "([Ljava/lang/String;)V")
+        if (mainMethod.isEmpty()) {
+            throw RuntimeException("main method not found")
+        }
+        val mainMethodCode =
+            classFile.getBinaryCode(mainMethod[0]) ?: throw RuntimeException("main method Code not found")
+        logger.debug("mainMethodCode $mainMethodCode")
+
+        val firstFrame = Frame(classFile, mainMethodCode)
+        frameStack.push(firstFrame)
+
+        while (!frameStack.isEmpty()) {
+            val additionalFrame = frameStack.peek().run()
+            if (additionalFrame != null) {
+                frameStack.push(additionalFrame)
+            } else {
+                frameStack.pop()
+            }
+        }
+    }
+
+
 }
