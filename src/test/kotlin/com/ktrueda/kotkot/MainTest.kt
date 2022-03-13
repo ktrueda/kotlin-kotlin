@@ -39,9 +39,14 @@ class MainTest {
         }.asStream()
 
     @Test
+    fun classLoader() {
+        val mcl = MyClassLoader.load(File("./target/src/"))
+    }
+
+    @Test
     @EnabledOnOs(OS.MAC)
     fun dev() {
-        val cf: ClassFile = ClassFile.load(File("./target/src/RecursiveKt.class"))
+        val cf: ClassFile = ClassFile.load(File("./target/src/OtherClassKt.class"))
         val executor = Executor(cf)
         executor.runMain()
     }

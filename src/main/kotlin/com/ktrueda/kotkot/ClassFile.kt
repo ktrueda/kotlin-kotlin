@@ -271,7 +271,6 @@ class ClassFile(
         return Code(DataInputStream(codeAttr.info.inputStream()))
     }
 
-
     companion object {
         fun load(path: File): ClassFile {
             val raf = RandomAccessFile(path, "r")
@@ -321,5 +320,19 @@ class ClassFile(
             )
         }
     }
+}
 
+class MyClassLoader private constructor(private val map: Map<String, ClassFile>) {
+
+    companion object {
+        fun load(path: File): MyClassLoader {
+            val map = path.walk()
+                .filter { it.toPath().toAbsolutePath().endsWith(".class") }
+                .map {
+                    val className = it.toPath().fileName.toString().split('.')[0]
+                    className to ClassFile.load(it)
+                }.toMap()
+            return MyClassLoader(map)
+        }
+    }
 }
