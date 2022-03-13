@@ -12,14 +12,38 @@ private fun ByteArrayInputStream.read(n: Int): ByteArray {
     return ba
 }
 
+private class MyByteArrayInputStream : ByteArrayInputStream {
+    constructor(ba: ByteArray) : super(ba) {
+    }
+
+    fun getPos(): Int {
+        return pos
+    }
+
+    fun setPos(pos: Int) {
+        this.pos = pos
+    }
+}
+
+private fun ByteArray.myInputStream(): MyByteArrayInputStream {
+    return MyByteArrayInputStream(this)
+}
+
 class Frame(private val classFile: ClassFile, private val code: Code) {
     private val logger = KotlinLogging.logger {}
-    private val operandStack = Stack<Any>()
+    val operandStack = Stack<Any>()
     private val localVariables = Array<Any>(code.maxLocals) { 0 }
-    private val inputStream: ByteArrayInputStream = code.binaryCode.inputStream()
+    private val inputStream: MyByteArrayInputStream = code.binaryCode.myInputStream()
 
-    fun run(): Frame? {
+    fun run(): Any? {
         inputStream.reset()
+        logger.info(
+            """
+            ############## frame created ########
+            ${code.binaryCode.toHex()}
+            #####################################
+        """.trimIndent()
+        )
         while (true) {
             val opCode = inputStream.read()
             logger.info(
@@ -29,16 +53,24 @@ class Frame(private val classFile: ClassFile, private val code: Code) {
                 opCode: ${Integer.toHexString(opCode)}
                 operandStack: $operandStack
                 localVariables: $localVariables
+                currentPos: ${inputStream.getPos() - 1}
                 ################################
                 """.trimIndent()
             )
             val nextFrame = when (opCode) {
+                0x4 -> iconst(1, inputStream)
                 0x5 -> iconst(2, inputStream)
                 0x6 -> iconst(3, inputStream)
+                0x7 -> iconst(4, inputStream)
                 0x10 -> bipush(inputStream)
                 0x12 -> ldc(inputStream)
                 0x1a -> iload(0, inputStream)
                 0x3b -> istore(0, inputStream)
+                0xa7 -> goto(inputStream)
+                0xaa -> tableswitch(inputStream)
+                0xac -> {
+                    return@run operandStack.pop()
+                }
                 0xb2 -> getstatic(inputStream)
                 0xb1 -> {
                     _return(inputStream)
@@ -56,7 +88,8 @@ class Frame(private val classFile: ClassFile, private val code: Code) {
         return null
     }
 
-    //0x6
+
+    //0x4, 0x5, 0x6, 0x7
     private fun iconst(n: Int, inputStream: ByteArrayInputStream): Frame? {
         operandStack.push(n)
         return null
@@ -95,6 +128,38 @@ class Frame(private val classFile: ClassFile, private val code: Code) {
         localVariables[n] = operandStack.pop()
         return null
     }
+
+    //0xa7
+    private fun goto(inputStream: MyByteArrayInputStream): Frame? {
+        val instructionPos = inputStream.getPos() - 1
+        inputStream.setPos(instructionPos + inputStream.read(2).toInt())
+        return null
+    }
+
+    //0xaa
+    private fun tableswitch(inputStream: MyByteArrayInputStream): Frame? {
+        logger.info("OPCODE: tableswitch")
+        val instructionPos = inputStream.getPos() - 1
+        inputStream.read((3 - instructionPos) % 4)
+        val defaultValue = inputStream.read(4).toInt()
+        val lowValue = inputStream.read(4).toInt()
+        val highValue = inputStream.read(4).toInt()
+        val index = operandStack.pop() as Int
+
+        val nextPos = if (index < lowValue || index > highValue) {
+            instructionPos + defaultValue
+        } else {
+            val diff = index - lowValue
+            repeat(diff - 1) {
+                inputStream.read(4)
+            }
+            instructionPos + inputStream.read(4).toInt()
+        }
+        logger.debug("next pos ${nextPos}")
+        inputStream.setPos(nextPos)
+        return null
+    }
+
 
     //0xb2
     private fun getstatic(inputStream: ByteArrayInputStream): Frame? {
@@ -199,7 +264,12 @@ class Executor(private val classFile: ClassFile) {
         while (!frameStack.isEmpty()) {
             val additionalFrame = frameStack.peek().run()
             if (additionalFrame != null) {
-                frameStack.push(additionalFrame)
+                if (additionalFrame is Frame) {
+                    frameStack.push(additionalFrame)
+                } else {
+                    frameStack.pop()
+                    frameStack.peek().operandStack.push(additionalFrame)
+                }
             } else {
                 frameStack.pop()
             }

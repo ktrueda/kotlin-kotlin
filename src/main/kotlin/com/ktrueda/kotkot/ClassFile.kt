@@ -7,13 +7,13 @@ import java.io.RandomAccessFile
 
 
 fun ByteArray.toHex(): String =
-    joinToString(separator = "") { eachByte -> "%02x".format(eachByte) }
+    joinToString(separator = " ") { eachByte -> "%02x".format(eachByte) }
 
 fun Int.pow(n: Int): Int = if (n == 0) 1 else n * this.pow(n - 1)
 
 fun ByteArray.toInt(): Int {
     return List(this.size) {
-        255.pow(it) * this[this.size - it - 1] // overflow
+        255.pow(it) * this[this.size - it - 1].toUByte().toInt() // overflow
     }.sum()
 }
 
