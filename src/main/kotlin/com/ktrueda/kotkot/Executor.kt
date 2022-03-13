@@ -29,19 +29,23 @@ private fun ByteArray.myInputStream(): MyByteArrayInputStream {
     return MyByteArrayInputStream(this)
 }
 
-class Frame(private val classFile: ClassFile, private val code: Code) {
+class Frame(
+    private val classFile: ClassFile,
+    private val code: Code,
+    private var localVariables: Array<Any>
+) {
     private val logger = KotlinLogging.logger {}
     val operandStack = Stack<Any>()
-    private val localVariables = Array<Any>(code.maxLocals) { 0 }
     private val inputStream: MyByteArrayInputStream = code.binaryCode.myInputStream()
 
     fun run(): Any? {
         inputStream.reset()
         logger.info(
             """
-            ############## frame created ########
+            ############## frame created/resumed ########
             ${code.binaryCode.toHex()}
-            #####################################
+            currentPos: ${inputStream.getPos()}
+            ############################################
         """.trimIndent()
         )
         while (true) {
@@ -66,6 +70,8 @@ class Frame(private val classFile: ClassFile, private val code: Code) {
                 0x12 -> ldc(inputStream)
                 0x1a -> iload(0, inputStream)
                 0x3b -> istore(0, inputStream)
+                0x60 -> iadd(inputStream)
+                0x64 -> isub(inputStream)
                 0xa7 -> goto(inputStream)
                 0xaa -> tableswitch(inputStream)
                 0xac -> {
@@ -126,6 +132,23 @@ class Frame(private val classFile: ClassFile, private val code: Code) {
     //0x3b
     private fun istore(n: Int, inputStream: ByteArrayInputStream): Frame? {
         localVariables[n] = operandStack.pop()
+        return null
+    }
+
+    //0x60
+    private fun iadd(inputStream: MyByteArrayInputStream): Frame? {
+        val value1 = operandStack.pop() as Int
+        val value2 = operandStack.pop() as Int
+        operandStack.push(value2 + value1)
+        return null
+    }
+
+    //0x64
+    private fun isub(inputStream: MyByteArrayInputStream): Frame? {
+        logger.info("OPCODE: isub")
+        val value1 = operandStack.pop() as Int
+        val value2 = operandStack.pop() as Int
+        operandStack.push(value2 - value1)
         return null
     }
 
@@ -244,7 +267,14 @@ class Frame(private val classFile: ClassFile, private val code: Code) {
 
         val targetCode = classFile.getBinaryCode(foundMethods[0])
             ?: throw RuntimeException("$methodName $methodDescriptor not found")//TODO
-        return Frame(classFile, targetCode)
+
+        logger.debug("desciptor $methodDescriptor")
+        val args = if (methodDescriptor == "()V") {//TODO
+            listOf()
+        } else {
+            listOf(operandStack.pop()) //TODO
+        }
+        return Frame(classFile, targetCode, args.toTypedArray())
     }
 }
 
@@ -258,7 +288,7 @@ class Executor(private val classFile: ClassFile) {
         }
         val mainMethodCode =
             classFile.getBinaryCode(mainMethod[0]) ?: throw RuntimeException("main method Code not found")
-        val firstFrame = Frame(classFile, mainMethodCode)
+        val firstFrame = Frame(classFile, mainMethodCode, Array<Any>(0) {})
         frameStack.push(firstFrame)
 
         while (!frameStack.isEmpty()) {
@@ -266,7 +296,7 @@ class Executor(private val classFile: ClassFile) {
             if (additionalFrame != null) {
                 if (additionalFrame is Frame) {
                     frameStack.push(additionalFrame)
-                } else {
+                } else if (additionalFrame !is Unit) {
                     frameStack.pop()
                     frameStack.peek().operandStack.push(additionalFrame)
                 }
