@@ -3,7 +3,7 @@ package com.ktrueda.kotkot
 import org.junit.jupiter.api.Test
 import java.io.File
 
-val skipCompile = true
+val skipCompile = false
 
 class MainTest {
     @Test
