@@ -12,6 +12,14 @@ private fun ByteArrayInputStream.read(n: Int): ByteArray {
     return ba
 }
 
+val standardLib = mapOf(
+    "java/io/PrintStream" to mapOf(
+        "out" to fun(obj: Any): Unit {
+            println(obj)
+        }
+    )
+)
+
 class Executor(private val classFile: ClassFile) {
     private val logger = KotlinLogging.logger {}
     private val stack = Stack<Any>()
@@ -37,6 +45,10 @@ class Executor(private val classFile: ClassFile) {
             when (opCode) {
                 0x12 -> ldc(inputStream)
                 0xb2 -> getstatic(inputStream)
+                0xb1 -> {
+                    _return(inputStream)
+                    return
+                }
                 0xb6 -> invokevirtual(inputStream)
                 else -> throw RuntimeException("Not-implemented opcode $opCode")
             }
@@ -76,6 +88,11 @@ class Executor(private val classFile: ClassFile) {
         stack.push("$className.$methodName")
     }
 
+    //0xb1
+    private fun _return(inputStream: ByteArrayInputStream) {
+
+    }
+
     //0xb6
     private fun invokevirtual(inputStream: ByteArrayInputStream) {
         logger.info("OPCODE: invokevirtual")
@@ -88,9 +105,20 @@ class Executor(private val classFile: ClassFile) {
 
         val cpNameAndType = classFile.constantPools[cpMethodRef.nameAndTypeIndex - 1] as ConstantPoolNameAndType
         val methodNameUtf8 = classFile.constantPools[cpNameAndType.nameIndex - 1] as ConstantPoolUtf8
+        val methodName = methodNameUtf8.info.decodeToString()
         val methodArgsExpUtf8 = classFile.constantPools[cpNameAndType.descriptorIndex - 1] as ConstantPoolUtf8
 
-        logger.debug("$className.${methodNameUtf8.info.decodeToString()} ${methodArgsExpUtf8.info.decodeToString()}")
+        logger.debug("$className.${methodName} ${methodArgsExpUtf8.info.decodeToString()}")
 
+        val args = mutableListOf<Any>()
+        repeat(1) {//TODO
+            args.add(stack.pop())
+        }
+
+        if (className == "java/io/PrintStream") {
+            println(args[args.size - 1])//TODO
+        } else {
+            TODO()
+        }
     }
 }
