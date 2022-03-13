@@ -14,7 +14,7 @@ private fun ByteArrayInputStream.read(n: Int): ByteArray {
 
 class Frame(private val classFile: ClassFile, private val code: Code) {
     private val logger = KotlinLogging.logger {}
-    private val opeRandStack = Stack<Any>()
+    private val operandStack = Stack<Any>()
     private val inputStream: ByteArrayInputStream = code.binaryCode.inputStream()
 
     fun run(): Frame? {
@@ -26,7 +26,7 @@ class Frame(private val classFile: ClassFile, private val code: Code) {
                 ####### new  op code ###########
                 frame: ${this.hashCode()}
                 opCode: ${Integer.toHexString(opCode)}
-                stack: $opeRandStack
+                stack: $operandStack
                 ################################
                 """.trimIndent()
             )
@@ -49,7 +49,6 @@ class Frame(private val classFile: ClassFile, private val code: Code) {
         return null
     }
 
-
     //0x12
     private fun ldc(inputStream: ByteArrayInputStream): Frame? {
         logger.info("OPCODE: ldc")
@@ -57,9 +56,9 @@ class Frame(private val classFile: ClassFile, private val code: Code) {
         val cp = classFile.constantPools[cpIndex - 1]
         if (cp is ConstantPoolString) {
             val cpUtf8 = classFile.constantPools[cp.stringIndex - 1] as ConstantPoolUtf8
-            opeRandStack.push(cpUtf8.info.decodeToString())
+            operandStack.push(cpUtf8.info.decodeToString())
         } else if (cp is ConstantPoolInteger) {
-            opeRandStack.push(cp.value)
+            operandStack.push(cp.value)
         } else {
             throw RuntimeException("Unknown")
         }
@@ -82,7 +81,7 @@ class Frame(private val classFile: ClassFile, private val code: Code) {
 
         logger.debug("$className.$methodName")
 
-        opeRandStack.push("$className.$methodName")
+        operandStack.push("$className.$methodName")
         return null
     }
 
@@ -111,7 +110,7 @@ class Frame(private val classFile: ClassFile, private val code: Code) {
 
         val args = mutableListOf<Any>()
         repeat(1) {//TODO
-            args.add(opeRandStack.pop())
+            args.add(operandStack.pop())
         }
 
         if (className == "java/io/PrintStream") {
@@ -155,7 +154,6 @@ class Frame(private val classFile: ClassFile, private val code: Code) {
 
 class Executor(private val classFile: ClassFile) {
     private val logger = KotlinLogging.logger {}
-    private val opeRandStack = Stack<Any>()
     private val frameStack = Stack<Frame>()
     fun runMain() {
         val mainMethod = classFile.findMethod("main", "([Ljava/lang/String;)V")
@@ -164,8 +162,6 @@ class Executor(private val classFile: ClassFile) {
         }
         val mainMethodCode =
             classFile.getBinaryCode(mainMethod[0]) ?: throw RuntimeException("main method Code not found")
-        logger.debug("mainMethodCode $mainMethodCode")
-
         val firstFrame = Frame(classFile, mainMethodCode)
         frameStack.push(firstFrame)
 
@@ -178,6 +174,4 @@ class Executor(private val classFile: ClassFile) {
             }
         }
     }
-
-
 }
