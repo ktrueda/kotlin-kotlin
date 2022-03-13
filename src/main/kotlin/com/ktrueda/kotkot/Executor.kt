@@ -15,6 +15,7 @@ private fun ByteArrayInputStream.read(n: Int): ByteArray {
 class Frame(private val classFile: ClassFile, private val code: Code) {
     private val logger = KotlinLogging.logger {}
     private val operandStack = Stack<Any>()
+    private val localVariables = Array<Any>(code.maxLocals) { 0 }
     private val inputStream: ByteArrayInputStream = code.binaryCode.inputStream()
 
     fun run(): Frame? {
@@ -26,12 +27,16 @@ class Frame(private val classFile: ClassFile, private val code: Code) {
                 ####### new  op code ###########
                 frame: ${this.hashCode()}
                 opCode: ${Integer.toHexString(opCode)}
-                stack: $operandStack
+                operandStack: $operandStack
+                localVariables: $localVariables
                 ################################
                 """.trimIndent()
             )
             val nextFrame = when (opCode) {
+                0x6 -> iconst(3, inputStream)
                 0x12 -> ldc(inputStream)
+                0x1a -> iload(0, inputStream)
+                0x3b -> istore(0, inputStream)
                 0xb2 -> getstatic(inputStream)
                 0xb1 -> {
                     _return(inputStream)
@@ -39,13 +44,19 @@ class Frame(private val classFile: ClassFile, private val code: Code) {
                 }
                 0xb6 -> invokevirtual(inputStream)
                 0xb8 -> invokestatic(inputStream)
-                else -> throw RuntimeException("Not-implemented opcode $opCode")
+                else -> throw RuntimeException("Not-implemented opcode ${Integer.toHexString(opCode)}")
             }
             if (nextFrame != null) {
                 inputStream.mark(1)
                 return nextFrame;
             }
         }
+        return null
+    }
+
+    //0x6
+    private fun iconst(n: Int, inputStream: ByteArrayInputStream): Frame? {
+        operandStack.push(n)
         return null
     }
 
@@ -62,6 +73,18 @@ class Frame(private val classFile: ClassFile, private val code: Code) {
         } else {
             throw RuntimeException("Unknown")
         }
+        return null
+    }
+
+    //0x1a
+    private fun iload(n: Int, inputStream: ByteArrayInputStream): Frame? {
+        operandStack.push(localVariables[n])
+        return null
+    }
+
+    //0x3b
+    private fun istore(n: Int, inputStream: ByteArrayInputStream): Frame? {
+        localVariables[n] = operandStack.pop()
         return null
     }
 
