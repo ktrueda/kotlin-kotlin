@@ -152,6 +152,8 @@ class Method(randomAccessFile: RandomAccessFile) {
             Attribute(randomAccessFile)
         }
     }
+
+    fun isStatic() = (accessFlag and 0x0008) > 0 //TODO
 }
 
 class Code(input: DataInput) {

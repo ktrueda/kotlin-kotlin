@@ -277,17 +277,18 @@ class Frame(
 
         logger.debug("$className.${methodName} ${methodArgsExpUtf8.info.decodeToString()}")
 
-        val args = mutableListOf<Any>()
-        repeat(1) {//TODO
-            args.add(operandStack.pop())
-        }
-
         if (className == "java/io/PrintStream") {
-            println(args[args.size - 1])//TODO
+            println(operandStack.pop())
             return null
         } else {
             val classFile = classLoader.get(className) ?: throw RuntimeException("class not found")
             val method = classFile.findMethod(methodName, methodDescriptor)!![0]
+            val staticPlus = if (!method.isStatic()) 1 else 0
+            val args = List(DescriptorUtil.argTypes(methodDescriptor).size + staticPlus) {
+                operandStack.pop()
+            }
+                .reversed()
+
             val frame = Frame(classLoader, classFile, method, args.toTypedArray())
             return frame
         }
@@ -311,8 +312,21 @@ class Frame(
         val methodDescriptorUtf8 = classFile.constantPools[cpMethod.descriptorIndex - 1] as ConstantPoolUtf8
         val methodDescriptor = methodDescriptorUtf8.info.decodeToString()
 
+        //TODO
+        if (className == "kotlin/jvm/internal/Intrinsics" && methodName == "checkNotNullParameter") {
+            return null
 
-        val targetClassFile = classLoader.get(className) ?: throw RuntimeException("Class not found")
+        }
+        //TODO
+        if (className == "kotlin/jvm/internal/Intrinsics" && methodName == "stringPlus") {
+            val str2 = operandStack.pop() as String
+            val str1 = operandStack.pop() as String
+            operandStack.push(str1 + str2)
+            return null
+        }
+
+        val targetClassFile =
+            classLoader.get(className) ?: throw RuntimeException("Class not found $className method: $methodName")
         val foundMethods = targetClassFile.findMethod(methodName, methodDescriptor)
         if (foundMethods.isEmpty()) {
             throw RuntimeException("$methodName $methodDescriptor not found")
