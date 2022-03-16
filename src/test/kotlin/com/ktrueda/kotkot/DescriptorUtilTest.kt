@@ -1,5 +1,6 @@
 package com.ktrueda.kotkot
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.MethodSource
@@ -8,23 +9,26 @@ internal class DescriptorUtilTest {
 
     @ParameterizedTest(name = "{0} => {1}")
     @MethodSource("numOfArgMethodSource")
-    fun numOfArg(descriptor: String, num: Int) {
-        assert(DescriptorUtil.numOfArg(descriptor) == num)
+    fun argTypes(descriptor: String, expected: List<String>) {
+        assertThat(DescriptorUtil.argTypes(descriptor)).isEqualTo(expected)
     }
 
     companion object {
         @JvmStatic
         fun numOfArgMethodSource(): List<Arguments> {
             return listOf<Arguments>(
-                Arguments.of("(I)I", 1),
-                Arguments.of("(II)I", 2),
-                Arguments.of("()V", 0),
-                Arguments.of("()I", 0),
-                Arguments.of("([Ljava/lang/String;)V", 1),
-                Arguments.of("([Ljava/lang/String;Ljava/lang/String;)V", 2),
-                Arguments.of("([I)V", 1),
-                Arguments.of("([I[I)V", 2),
-                Arguments.of("(Ljava/lang/String;I)V", 2)
+                Arguments.of("(I)I", listOf("Int")),
+                Arguments.of("(II)I", listOf("Int", "Int")),
+                Arguments.of("()V", emptyList<String>()),
+                Arguments.of("()I", emptyList<String>()),
+                Arguments.of("([Ljava/lang/String;)V", listOf("java/lang/String")),
+                Arguments.of(
+                    "([Ljava/lang/String;Ljava/lang/String;)V",
+                    listOf("java/lang/String", "java/lang/String")
+                ),
+                Arguments.of("([I)V", listOf("Int[]")),
+                Arguments.of("([I[I)V", listOf("Int[]", "Int[]")),
+                Arguments.of("(Ljava/lang/String;I)V", listOf("java/lang/String", "Int"))
             )
         }
     }
