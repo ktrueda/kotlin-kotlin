@@ -37,6 +37,7 @@ class Frame(
 ) {
     private val logger = KotlinLogging.logger {}
     val operandStack = Stack<Any>()
+    val heap = Stack<Any>()
     val code: Code = classFile.getBinaryCode(method) ?: throw RuntimeException()
     private val inputStream: MyByteArrayInputStream = code.binaryCode.myInputStream()
 
@@ -63,6 +64,7 @@ class Frame(
                 operandStack: $operandStack
                 localVariables: ${localVariables.map { it?.toString() ?: "null" }}
                 currentPos: ${inputStream.getPos() - 1}
+                heap: ${heap.map { it?.toString() ?: "null" }}
                 ################################
                 """.trimIndent()
             )
@@ -75,11 +77,13 @@ class Frame(
                 0x10 -> bipush(inputStream)
                 0x12 -> ldc(inputStream)
                 0x1a -> iload(0, inputStream)
+                0x1b -> iload(1, inputStream)
                 0x1c -> iload(2, inputStream)
                 0x2a -> aload(0, inputStream)
                 0x2b -> aload(1, inputStream)
                 0x3b -> istore(0, inputStream)
                 0x4c -> astore(1, inputStream)
+                0x59 -> dup(inputStream)
                 0x60 -> iadd(inputStream)
                 0x64 -> isub(inputStream)
                 0x7e -> iand(inputStream)
@@ -94,8 +98,11 @@ class Frame(
                     _return(inputStream)
                     return@run null
                 }
+                0xb5 -> putfield(inputStream)
                 0xb6 -> invokevirtual(inputStream)
+                0xb7 -> invokespecial(inputStream)
                 0xb8 -> invokestatic(inputStream)
+                0xbb -> new(inputStream)
                 else -> throw RuntimeException("Not-implemented opcode ${Integer.toHexString(opCode)}")
             }
             if (nextFrame != null) {
@@ -120,6 +127,7 @@ class Frame(
 
     //0x10
     private fun bipush(inputStream: ByteArrayInputStream): Frame? {
+        logger.info("OPCODE: bipush")
         operandStack.push(inputStream.read())
         return null
     }
@@ -161,6 +169,15 @@ class Frame(
     //0x4c
     private fun astore(n: Int, inputStream: ByteArrayInputStream): Frame? {
         localVariables[n] = operandStack.pop()
+        return null
+    }
+
+    //0x59
+    private fun dup(inputStream: MyByteArrayInputStream): Frame? {
+        logger.info("OPCODE: dup")
+        val value = operandStack.pop()
+        operandStack.push(value)
+        operandStack.push(value)
         return null
     }
 
@@ -294,6 +311,41 @@ class Frame(
         }
     }
 
+    //0xb5
+    private fun putfield(inputStream: ByteArrayInputStream): Frame? {
+        TODO()
+    }
+
+    //0xb7
+    private fun invokespecial(inputStream: ByteArrayInputStream): Frame? {
+        logger.info("OPCODE: invokespecial")
+        val indexByte1 = inputStream.read()
+        val indexByte2 = inputStream.read()
+        val index = indexByte1 * 255 + indexByte2
+
+        val cpMethodRef = classFile.constantPools[index - 1] as ConstantPoolMethodRef
+        val cpClass = classFile.constantPools[cpMethodRef.classIndex - 1] as ConstantPoolClass
+        val cpClassNameUtf8 = classFile.constantPools[cpClass.nameIndex - 1] as ConstantPoolUtf8
+        val className = cpClassNameUtf8.info.decodeToString()
+
+        val cpNameType = classFile.constantPools[cpMethodRef.nameAndTypeIndex - 1] as ConstantPoolNameAndType
+        val cpMethodNameUtf8 = classFile.constantPools[cpNameType.nameIndex - 1] as ConstantPoolUtf8
+        val methodName = cpMethodNameUtf8.info.decodeToString()
+        val cpMethodDescriptorUtf8 = classFile.constantPools[cpNameType.descriptorIndex - 1] as ConstantPoolUtf8
+        val methodDescriptor = cpMethodDescriptorUtf8.info.decodeToString()
+
+        logger.debug("class: $className method :$methodName $methodDescriptor")
+        val classFile = classLoader.get(className) ?: throw RuntimeException("class not found $className")
+        val methods = classFile.findMethod(methodName, methodDescriptor)
+
+
+        val args = List(DescriptorUtil.argTypes(methodDescriptor).size + 1) {
+            operandStack.pop()
+        }.reversed()
+
+        return Frame(classLoader, classFile, methods[0], args.toTypedArray())
+    }
+
     //0xb8
     private fun invokestatic(inputStream: ByteArrayInputStream): Frame? {
         val indexByte1 = inputStream.read()
@@ -339,6 +391,29 @@ class Frame(
 
         val frame = Frame(classLoader, targetClassFile, foundMethods[0], args.toTypedArray())
         return frame
+    }
+
+    //0xbb
+    private fun new(inputStream: ByteArrayInputStream): Frame? {
+        logger.info("OPCODE: new")
+        val indexByte1 = inputStream.read()
+        val indexByte2 = inputStream.read()
+        val index = indexByte1 * 255 + indexByte2
+        val cpClass = classFile.constantPools[index - 1] as ConstantPoolClass
+        val cpClassNameUtf8 = classFile.constantPools[cpClass.nameIndex - 1] as ConstantPoolUtf8
+        val className = cpClassNameUtf8.info.decodeToString()
+        logger.debug("class : $className")
+        val classFile = classLoader.get(className) ?: throw RuntimeException("class not found $className")
+        heap.push(ObjectGenerator.new(classFile))
+
+        operandStack.push(heap.size - 1)
+        return null
+    }
+}
+
+object ObjectGenerator {
+    fun new(classFile: ClassFile): Any {
+        return Object()
     }
 }
 

@@ -337,7 +337,8 @@ class MyClassLoader private constructor(private val map: Map<String, ClassFile>)
                 .filter { it.toPath().toAbsolutePath().toString().endsWith(".class") }
                 .map {
                     val className = it.toPath().fileName.toString().split('.')[0]
-                    className to ClassFile.load(it)
+                    val classFile = ClassFile.load(it)
+                    classFile.getThisClassName() to classFile
                 }.toMap()
             return MyClassLoader(map)
         }
