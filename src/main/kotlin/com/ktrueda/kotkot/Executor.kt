@@ -33,11 +33,11 @@ class Frame(
     private val classLoader: MyClassLoader,
     private val classFile: ClassFile,
     private val method: Method,
-    private var localVariables: Array<Any?>
+    private var localVariables: Array<Any?>,
+    private val heap: Stack<Map<String, Any?>>
 ) {
     private val logger = KotlinLogging.logger {}
     val operandStack = Stack<Any>()
-    val heap = Stack<Any>()
     val code: Code = classFile.getBinaryCode(method) ?: throw RuntimeException()
     private val inputStream: MyByteArrayInputStream = code.binaryCode.myInputStream()
 
@@ -82,6 +82,7 @@ class Frame(
                 0x2a -> aload(0, inputStream)
                 0x2b -> aload(1, inputStream)
                 0x3b -> istore(0, inputStream)
+                0x4b -> astore(0, inputStream)
                 0x4c -> astore(1, inputStream)
                 0x59 -> dup(inputStream)
                 0x60 -> iadd(inputStream)
@@ -306,14 +307,29 @@ class Frame(
             }
                 .reversed()
 
-            val frame = Frame(classLoader, classFile, method, args.toTypedArray())
+            val frame = Frame(classLoader, classFile, method, args.toTypedArray(), heap)
             return frame
         }
     }
 
     //0xb5
     private fun putfield(inputStream: ByteArrayInputStream): Frame? {
-        TODO()
+        logger.info("OPCODE: putfield")
+        val indexByte1 = inputStream.read()
+        val indexByte2 = inputStream.read()
+        val index = indexByte1 * 255 + indexByte2
+
+        val cpFieldRef = classFile.constantPools[index - 1] as ConstantPoolFieldRef
+        val cpNameAndType = classFile.constantPools[cpFieldRef.nameAndTypeIndex - 1] as ConstantPoolNameAndType
+        val cpName = classFile.constantPools[cpNameAndType.nameIndex - 1] as ConstantPoolUtf8
+        val fieldName = cpName.info.decodeToString()
+
+
+        val value = operandStack.pop()
+        val objectref = operandStack.pop() as Int
+        heap[objectref] = ObjectGenerator.put(heap[objectref], fieldName, value)
+
+        return null
     }
 
     //0xb7
@@ -343,11 +359,12 @@ class Frame(
             operandStack.pop()
         }.reversed()
 
-        return Frame(classLoader, classFile, methods[0], args.toTypedArray())
+        return Frame(classLoader, classFile, methods[0], args.toTypedArray(), heap)
     }
 
     //0xb8
     private fun invokestatic(inputStream: ByteArrayInputStream): Frame? {
+        logger.info("OPCODE: invokestatic")
         val indexByte1 = inputStream.read()
         val indexByte2 = inputStream.read()
         val index = indexByte1 * 255 + indexByte2
@@ -385,11 +402,17 @@ class Frame(
         }
 
         logger.debug("desciptor $methodDescriptor ${DescriptorUtil.argTypes(methodDescriptor)}")
-        val args = List(DescriptorUtil.argTypes(methodDescriptor).size) {
-            operandStack.pop()
+        //TODO miss design
+        val maxLocals = targetClassFile.getBinaryCode(foundMethods[0])!!.maxLocals
+        val args = List(maxLocals) {
+            if (it < DescriptorUtil.argTypes(methodDescriptor).size) {
+                operandStack.pop()
+            } else {
+                null
+            }
         }.reversed()
 
-        val frame = Frame(classLoader, targetClassFile, foundMethods[0], args.toTypedArray())
+        val frame = Frame(classLoader, targetClassFile, foundMethods[0], args.toTypedArray(), heap)
         return frame
     }
 
@@ -412,8 +435,15 @@ class Frame(
 }
 
 object ObjectGenerator {
-    fun new(classFile: ClassFile): Any {
-        return Object()
+    fun new(classFile: ClassFile): Map<String, Any?> {
+        return classFile.fields.associate {
+            val cpUtf8 = classFile.constantPools[it.nameIndex - 1] as ConstantPoolUtf8
+            cpUtf8.info.decodeToString() to null
+        }
+    }
+
+    fun put(obj: Map<String, Any?>, field: String, value: Any?): Map<String, Any?> {
+        return obj + Pair(field, value)
     }
 }
 
@@ -430,7 +460,7 @@ class Executor(
         if (mainMethod.isEmpty()) {
             throw RuntimeException("main method not found")
         }
-        val firstFrame = Frame(classLoader, classFile, mainMethod[0], Array<Any?>(0) {})
+        val firstFrame = Frame(classLoader, classFile, mainMethod[0], Array<Any?>(0) {}, Stack())
         frameStack.push(firstFrame)
 
         while (!frameStack.isEmpty()) {
