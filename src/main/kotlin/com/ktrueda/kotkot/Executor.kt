@@ -99,6 +99,7 @@ class Frame(
                     _return(inputStream)
                     return@run null
                 }
+                0xb4 -> getfield(inputStream)
                 0xb5 -> putfield(inputStream)
                 0xb6 -> invokevirtual(inputStream)
                 0xb7 -> invokespecial(inputStream)
@@ -312,6 +313,22 @@ class Frame(
         }
     }
 
+    //0xb4
+    private fun getfield(inputStream: ByteArrayInputStream): Frame? {
+        logger.info("OPCODE: getfield")
+        val indexByte1 = inputStream.read()
+        val indexByte2 = inputStream.read()
+        val index = indexByte1 * 255 + indexByte2
+
+        val cpFieldRef = classFile.constantPools[index - 1] as ConstantPoolFieldRef
+        val cpNameAndType = classFile.constantPools[cpFieldRef.nameAndTypeIndex - 1] as ConstantPoolNameAndType
+        val cpName = classFile.constantPools[cpNameAndType.nameIndex - 1] as ConstantPoolUtf8
+        val fieldName = cpName.info.decodeToString()
+        val objectref = operandStack.pop() as Int
+        operandStack.push(ObjectGenerator.get(heap[objectref], fieldName))
+        return null
+    }
+
     //0xb5
     private fun putfield(inputStream: ByteArrayInputStream): Frame? {
         logger.info("OPCODE: putfield")
@@ -444,6 +461,10 @@ object ObjectGenerator {
 
     fun put(obj: Map<String, Any?>, field: String, value: Any?): Map<String, Any?> {
         return obj + Pair(field, value)
+    }
+
+    fun get(obj: Map<String, Any?>, field: String): Any? {
+        return obj[field]
     }
 }
 
