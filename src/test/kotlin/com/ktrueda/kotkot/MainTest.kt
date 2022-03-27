@@ -52,6 +52,6 @@ class MainTest {
 //        val mcl = MyClassLoader.load(File("./target/src/"))
 //        val executor = Executor(mcl, "OtherClassKt")
 //        executor.runMain()
-        ClassFile.load(File("./target/src/ByLazy\$value\$2.class"))
+        ClassFile.load(File("./target/src/kotlin/ranges/URangesKt"))
     }
 }

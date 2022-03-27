@@ -1,6 +1,10 @@
 package com.ktrueda.kotkot
 
-import java.io.*
+import mu.KotlinLogging
+import java.io.DataInput
+import java.io.DataInputStream
+import java.io.File
+import java.io.RandomAccessFile
 
 
 fun ByteArray.toHex(): String =
@@ -356,14 +360,34 @@ class MyClassLoader private constructor(private val map: Map<String, ClassFile>)
 
 
     companion object {
+        private val logger = KotlinLogging.logger {}
         fun load(path: File): MyClassLoader {
+
             val map = path.walk()
                 .filter { it.toPath().toAbsolutePath().toString().endsWith(".class") }
+                .filter {
+                    setOf(
+                        "./target/src/Object.class",
+                        "./target/src/ByLazy.class",
+                        "./target/src/ByLazyKt.class",
+                        "./target/src/MathKt.class",
+                        "./target/src/RecursiveKt.class",
+                        "./target/src/Printer.class",
+                        "./target/src/Person.class",
+                        "./target/src/kotlin/LazyKt.class",
+                        "./target/src/HelloWorldKt.class",
+                        "./target/src/OtherClassKt.class",
+                        "./target/src/NewObjectKt.class",
+                    ).contains(
+                        it.toPath().toString()
+                    )
+                }
                 .map {
+                    logger.debug("try to load $it")
                     return@map try {
                         val classFile = ClassFile.load(it)
                         classFile.getThisClassName() to classFile
-                    } catch (e: EOFException) {
+                    } catch (e: Exception) {
                         val fileName = it.toPath().toString()
                         throw ClassFileLoadException("failed to parse $fileName", e)
                     }

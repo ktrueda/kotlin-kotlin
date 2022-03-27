@@ -416,7 +416,7 @@ class Frame(
             classLoader.get(className) ?: throw RuntimeException("Class not found $className method: $methodName")
         val foundMethods = targetClassFile.findMethod(methodName, methodDescriptor)
         if (foundMethods.isEmpty()) {
-            throw RuntimeException("$methodName $methodDescriptor not found")
+            throw RuntimeException("$className $methodName $methodDescriptor not found")
         }
 
         logger.debug("desciptor $methodDescriptor ${DescriptorUtil.argTypes(methodDescriptor)}")
@@ -481,7 +481,8 @@ class Executor(
     private val classLoader: MyClassLoader,
     private val mainClass: String
 ) {
-    private val classFile: ClassFile = classLoader.get(mainClass) ?: throw RuntimeException("class not found")
+    private val classFile: ClassFile =
+        classLoader.get(mainClass) ?: throw RuntimeException("class not found $mainClass")
     private val logger = KotlinLogging.logger {}
     private val frameStack = Stack<Frame>()
 
