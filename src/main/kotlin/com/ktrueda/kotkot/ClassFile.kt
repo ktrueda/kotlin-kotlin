@@ -364,12 +364,13 @@ class MyClassLoader private constructor(private val map: Map<String, ClassFile>)
                         val classFile = ClassFile.load(it)
                         classFile.getThisClassName() to classFile
                     } catch (e: EOFException) {
-                        val fileName = it.toPath().fileName
-                        println("failed to parse $fileName")
-                        throw e
+                        val fileName = it.toPath().toString()
+                        throw ClassFileLoadException("failed to parse $fileName", e)
                     }
                 }.toMap()
             return MyClassLoader(map)
         }
     }
 }
+
+class ClassFileLoadException(message: String, cause: Throwable) : Exception(message, cause)

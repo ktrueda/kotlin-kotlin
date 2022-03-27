@@ -105,6 +105,7 @@ class Frame(
                 0xb7 -> invokespecial(inputStream)
                 0xb8 -> invokestatic(inputStream)
                 0xbb -> new(inputStream)
+                0xc0 -> checkcast(inputStream)
                 else -> throw RuntimeException("Not-implemented opcode ${Integer.toHexString(opCode)}")
             }
             if (nextFrame != null) {
@@ -447,6 +448,14 @@ class Frame(
         heap.push(ObjectGenerator.new(classFile))
 
         operandStack.push(heap.size - 1)
+        return null
+    }
+
+    //0xc0
+    private fun checkcast(inputStream: ByteArrayInputStream): Frame? {
+        val indexByte1 = inputStream.read()
+        val indexByte2 = inputStream.read()
+        //TODO
         return null
     }
 }
