@@ -1,9 +1,6 @@
 package com.ktrueda.kotkot
 
-import java.io.DataInput
-import java.io.DataInputStream
-import java.io.File
-import java.io.RandomAccessFile
+import java.io.*
 
 
 fun ByteArray.toHex(): String =
@@ -33,10 +30,12 @@ open class ConstantPool {
             return when (val type = randomAccessFile.read()) {
                 1 -> ConstantPoolUtf8(randomAccessFile)
                 3 -> ConstantPoolInteger(randomAccessFile)
+                5 -> ConstantPoolLong(randomAccessFile)
                 7 -> ConstantPoolClass(randomAccessFile)
                 8 -> ConstantPoolString(randomAccessFile)
                 9 -> ConstantPoolFieldRef(randomAccessFile)
                 10 -> ConstantPoolMethodRef(randomAccessFile)
+                11 -> ConstantPoolInterfaceMethodRef(randomAccessFile)
                 12 -> ConstantPoolNameAndType(randomAccessFile)
                 else -> throw RuntimeException("Not implemented constant pool type $type")
             }
@@ -72,11 +71,31 @@ class ConstantPoolClass : ConstantPool {
     }
 }
 
+class ConstantPoolInterfaceMethodRef(randomAccessFile: RandomAccessFile) : ConstantPool() {
+    var classIndex: Int = 0;
+    var nameAndTypeIndex: Int = 0;
+
+    init {
+        classIndex = randomAccessFile.read(2).toInt()
+        nameAndTypeIndex = randomAccessFile.read(2).toInt()
+    }
+}
+
 class ConstantPoolInteger : ConstantPool {
     var value: Int = 0
 
     constructor(randomAccessFile: RandomAccessFile) {
         value = randomAccessFile.read(4).toInt()
+    }
+}
+
+class ConstantPoolLong : ConstantPool {
+    var highByte: Int = 0
+    var lowByte: Int = 0
+
+    constructor(randomAccessFile: RandomAccessFile) {
+        highByte = randomAccessFile.read(4).toInt()
+        lowByte = randomAccessFile.read(4).toInt()
     }
 }
 
@@ -204,6 +223,7 @@ class ClassFile(
     val thisClass: Int,
     val superClass: Int,
     val interfacesCount: Int,
+    val interfaces: List<ConstantPoolClass>,
     val fieldsCount: Int,
     val fields: List<Field>,
     val methodsCount: Int,
@@ -289,7 +309,9 @@ class ClassFile(
             val thisClass = raf.read(2).toInt()
             val superClass = raf.read(2).toInt()
             val interfacesCount = raf.read(2).toInt()
-            // skip interface
+            val interfaces = List(interfacesCount) {
+                ConstantPoolClass(raf)
+            }
             val fieldsCount = raf.read(2).toInt()
             val fields = List(fieldsCount) {
                 Field(raf)
@@ -314,6 +336,7 @@ class ClassFile(
                 thisClass,
                 superClass,
                 interfacesCount,
+                interfaces,
                 fieldsCount,
                 fields,
                 methodsCount,
@@ -337,9 +360,14 @@ class MyClassLoader private constructor(private val map: Map<String, ClassFile>)
             val map = path.walk()
                 .filter { it.toPath().toAbsolutePath().toString().endsWith(".class") }
                 .map {
-                    val className = it.toPath().fileName.toString().split('.')[0]
-                    val classFile = ClassFile.load(it)
-                    classFile.getThisClassName() to classFile
+                    return@map try {
+                        val classFile = ClassFile.load(it)
+                        classFile.getThisClassName() to classFile
+                    } catch (e: EOFException) {
+                        val fileName = it.toPath().fileName
+                        println("failed to parse $fileName")
+                        throw e
+                    }
                 }.toMap()
             return MyClassLoader(map)
         }

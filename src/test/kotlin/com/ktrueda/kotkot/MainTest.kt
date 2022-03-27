@@ -43,14 +43,15 @@ class MainTest {
 
     @Test
     fun classLoader() {
-        val mcl = MyClassLoader.load(File("./target/src/"))
+        MyClassLoader.load(File("./target/src/"))
     }
 
     @Test
     @EnabledOnOs(OS.MAC)
     fun dev() {
-        val mcl = MyClassLoader.load(File("./target/src/"))
-        val executor = Executor(mcl, "OtherClassKt")
-        executor.runMain()
+//        val mcl = MyClassLoader.load(File("./target/src/"))
+//        val executor = Executor(mcl, "OtherClassKt")
+//        executor.runMain()
+        ClassFile.load(File("./target/src/ByLazy\$value\$2.class"))
     }
 }
