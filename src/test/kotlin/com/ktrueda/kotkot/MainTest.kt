@@ -4,8 +4,6 @@ import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.DynamicTest
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestFactory
-import org.junit.jupiter.api.condition.EnabledOnOs
-import org.junit.jupiter.api.condition.OS
 import java.io.File
 import java.util.stream.Stream
 import kotlin.streams.asStream
@@ -47,11 +45,11 @@ class MainTest {
     }
 
     @Test
-    @EnabledOnOs(OS.MAC)
+//    @EnabledOnOs(OS.MAC)
     fun dev() {
 //        val mcl = MyClassLoader.load(File("./target/src/"))
 //        val executor = Executor(mcl, "OtherClassKt")
 //        executor.runMain()
-        ClassFile.load(File("./target/src/kotlin/ranges/URangesKt"))
+        ClassFile.load(File("./target/src/kotlin/SynchronizedLazyImpl.class"))
     }
 }

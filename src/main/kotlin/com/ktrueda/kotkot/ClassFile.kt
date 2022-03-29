@@ -10,11 +10,11 @@ import java.io.RandomAccessFile
 fun ByteArray.toHex(): String =
     joinToString(separator = " ") { eachByte -> "%02x".format(eachByte) }
 
-fun Int.pow(n: Int): Int = if (n == 0) 1 else n * this.pow(n - 1)
+fun Int.pow(n: Int): Int = if (n == 0) 1 else this * this.pow(n - 1)
 
 fun ByteArray.toInt(): Int {
     return List(this.size) {
-        255.pow(it) * this[this.size - it - 1].toUByte().toInt() // overflow
+        256.pow(it) * this[this.size - it - 1].toUByte().toInt() // overflow
     }.sum()
 }
 
@@ -322,7 +322,9 @@ class ClassFile(
             }
             val methodsCount = raf.read(2).toInt()
             val methods = List(methodsCount) {
-                Method(raf)
+                val m = Method(raf)
+                println((constantPools[m.nameIndex - 1] as ConstantPoolUtf8).info.decodeToString())
+                m
             }
             val attributeCount = raf.read(2).toInt()
             val attributes = List(attributeCount) {
@@ -398,7 +400,7 @@ class MyClassLoader private constructor(private val map: Map<String, ClassFile>)
                         "./target/src/kotlin/LazyKt.class",
                         "./target/src/kotlin/LazyKt__LazyKt.class",
                         "./target/src/kotlin/LazyKt__LazyJVMKt.class",
-//                        "./target/src/kotlin/SynchronizedLazyImpl.class",
+                        "./target/src/kotlin/SynchronizedLazyImpl.class",
                         "./target/src/HelloWorldKt.class",
                         "./target/src/OtherClassKt.class",
                         "./target/src/NewObjectKt.class",
