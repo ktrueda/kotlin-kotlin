@@ -412,16 +412,16 @@ class Frame(
             return null
         }
 
-        val targetClassFile =
-            classLoader.get(className) ?: throw RuntimeException("Class not found $className method: $methodName")
-        val foundMethods = targetClassFile.findMethod(methodName, methodDescriptor)
+        val foundMethods = classLoader.findMethod(className, methodName, methodDescriptor)
         if (foundMethods.isEmpty()) {
             throw RuntimeException("$className $methodName $methodDescriptor not found")
         }
 
         logger.debug("desciptor $methodDescriptor ${DescriptorUtil.argTypes(methodDescriptor)}")
         //TODO miss design
-        val maxLocals = targetClassFile.getBinaryCode(foundMethods[0])!!.maxLocals
+        val targetClassFile = foundMethods[0].first
+        val targetMethod = foundMethods[0].second
+        val maxLocals = targetClassFile.getBinaryCode(targetMethod)!!.maxLocals
         val args = List(maxLocals) {
             if (it < DescriptorUtil.argTypes(methodDescriptor).size) {
                 operandStack.pop()
@@ -430,7 +430,7 @@ class Frame(
             }
         }.reversed()
 
-        val frame = Frame(classLoader, targetClassFile, foundMethods[0], args.toTypedArray(), heap)
+        val frame = Frame(classLoader, targetClassFile, targetMethod, args.toTypedArray(), heap)
         return frame
     }
 

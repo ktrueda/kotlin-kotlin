@@ -271,7 +271,7 @@ class ClassFile(
         return constantPoolUtf8.info.decodeToString()
     }
 
-    private fun getSuperClassName(): String {
+    fun getSuperClassName(): String {
         val constantPoolClass = constantPools[superClass - 1] as ConstantPoolClass
         val constantPoolUtf8 = constantPools[constantPoolClass.nameIndex - 1] as ConstantPoolUtf8
         return constantPoolUtf8.info.decodeToString()
@@ -358,6 +358,26 @@ class MyClassLoader private constructor(private val map: Map<String, ClassFile>)
 
     fun allClasses() = map.keys
 
+    fun findMethod(className: String, methodName: String, methodDescriptor: String): List<Pair<ClassFile, Method>> {
+
+        fun rec(cf: ClassFile, acc: MutableList<Pair<ClassFile, Method>>): MutableList<Pair<ClassFile, Method>> {
+            return when (cf.getThisClassName()) {
+                "java/lang/Object" -> acc
+                else -> {
+                    val methods = cf.findMethod(methodName, methodDescriptor).map { cf to it }
+                    val superClassName = cf.getSuperClassName()
+                    val superClassFile =
+                        get(superClassName) ?: throw RuntimeException("class not found $superClassName")
+                    return rec(superClassFile, (acc + methods).toMutableList())
+                }
+            }
+        }
+
+        val classFile = get(className) ?: throw RuntimeException("class not found $className")
+        return rec(classFile, mutableListOf()).toList()
+
+    }
+
 
     companion object {
         private val logger = KotlinLogging.logger {}
@@ -366,6 +386,7 @@ class MyClassLoader private constructor(private val map: Map<String, ClassFile>)
             val map = path.walk()
                 .filter { it.toPath().toAbsolutePath().toString().endsWith(".class") }
                 .filter {
+                    // currently kotkot can load some kind of class file.
                     setOf(
                         "./target/src/Object.class",
                         "./target/src/ByLazy.class",
@@ -375,6 +396,9 @@ class MyClassLoader private constructor(private val map: Map<String, ClassFile>)
                         "./target/src/Printer.class",
                         "./target/src/Person.class",
                         "./target/src/kotlin/LazyKt.class",
+                        "./target/src/kotlin/LazyKt__LazyKt.class",
+                        "./target/src/kotlin/LazyKt__LazyJVMKt.class",
+//                        "./target/src/kotlin/SynchronizedLazyImpl.class",
                         "./target/src/HelloWorldKt.class",
                         "./target/src/OtherClassKt.class",
                         "./target/src/NewObjectKt.class",
