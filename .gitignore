@@ -2,3 +2,4 @@ build
 .gradle
 *.class
 META-INF
+*.jar

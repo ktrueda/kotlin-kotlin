@@ -100,11 +100,14 @@ class Frame(
                 0xac -> {
                     return@run operandStack.pop()
                 }
-                0xb2 -> getstatic(inputStream)
+                0xb0 -> {
+                    return@run operandStack.pop()
+                }
                 0xb1 -> {
                     _return(inputStream)
                     return@run null
                 }
+                0xb2 -> getstatic(inputStream)
                 0xb4 -> getfield(inputStream)
                 0xb5 -> putfield(inputStream)
                 0xb6 -> invokevirtual(inputStream)
