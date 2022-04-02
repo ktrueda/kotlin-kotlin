@@ -50,6 +50,7 @@ class Frame(
             class: ${classFile.getThisClassName()}
             method: ${(classFile.constantPools[method.nameIndex - 1] as ConstantPoolUtf8).info.decodeToString()}
             currentPos: ${inputStream.getPos()}
+            maxLocals: ${code.maxLocals}
             localVariables: ${localVariables.map { it?.toString() ?: "null" }}
             ############################################
         """.trimIndent()
@@ -59,7 +60,8 @@ class Frame(
             logger.info(
                 """
                 ####### new  op code ###########
-                frame: ${this.hashCode()}
+                frameHash: ${this.hashCode()}
+                class.method: ${classFile.getThisClassName()}.${(classFile.constantPools[method.nameIndex - 1] as ConstantPoolUtf8).info.decodeToString()}
                 opCode: ${Integer.toHexString(opCode)}
                 operandStack: $operandStack
                 localVariables: ${localVariables.map { it?.toString() ?: "null" }}
@@ -375,13 +377,18 @@ class Frame(
         logger.debug("class: $className method :$methodName $methodDescriptor")
         val classFile = classLoader.get(className) ?: throw RuntimeException("class not found $className")
         val methods = classFile.findMethod(methodName, methodDescriptor)
+        val targetMethod = methods[0]
+        val maxLocals = classFile.getBinaryCode(targetMethod)?.maxLocals ?: throw RuntimeException("method size 0")
 
-
-        val args = List(DescriptorUtil.argTypes(methodDescriptor).size + 1) {
-            operandStack.pop()
+        val args = List(maxLocals) {
+            if (it < DescriptorUtil.argTypes(methodDescriptor).size + 1) {
+                operandStack.pop()
+            } else {
+                null
+            }
         }.reversed()
 
-        return Frame(classLoader, classFile, methods[0], args.toTypedArray(), heap)
+        return Frame(classLoader, classFile, targetMethod, args.toTypedArray(), heap)
     }
 
     //0xb8
