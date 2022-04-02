@@ -47,9 +47,10 @@ class MainTest {
     @Test
 //    @EnabledOnOs(OS.MAC)
     fun dev() {
-//        val mcl = MyClassLoader.load(File("./target/src/"))
-//        val executor = Executor(mcl, "OtherClassKt")
-//        executor.runMain()
-        ClassFile.load(File("./target/src/ExtendKt.class"))
+        val mcl = MyClassLoader.load(File("./target/src/"))
+//        val executor = Executor(mcl, "NewObjectKt")
+        val executor = Executor(mcl, "ByLazyKt")
+        executor.runMain()
+//        ClassFile.load(File("./target/src/ByLazyKt.class"))
     }
 }

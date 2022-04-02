@@ -85,6 +85,7 @@ class Frame(
                 0x2a -> aload(0, inputStream)
                 0x2b -> aload(1, inputStream)
                 0x2c -> aload(2, inputStream)
+                0x2d -> aload(3, inputStream)
                 0x3b -> istore(0, inputStream)
                 0x4b -> astore(0, inputStream)
                 0x4c -> astore(1, inputStream)
@@ -115,6 +116,7 @@ class Frame(
                 0xb8 -> invokestatic(inputStream)
                 0xbb -> new(inputStream)
                 0xc0 -> checkcast(inputStream)
+                0xc7 -> ifnonnull(inputStream)
                 else -> throw RuntimeException("Not-implemented opcode ${Integer.toHexString(opCode)}")
             }
             if (nextFrame != null) {
@@ -313,10 +315,16 @@ class Frame(
             val classFile = classLoader.get(className) ?: throw RuntimeException("class not found")
             val method = classFile.findMethod(methodName, methodDescriptor)!![0]
             val staticPlus = if (!method.isStatic()) 1 else 0
-            val args = List(DescriptorUtil.argTypes(methodDescriptor).size + staticPlus) {
-                operandStack.pop()
-            }
-                .reversed()
+
+            val maxLocals = classFile.getBinaryCode(method)?.maxLocals ?: throw RuntimeException()
+
+            val args = List(maxLocals) {
+                if (it < DescriptorUtil.argTypes(methodDescriptor).size + staticPlus) {
+                    operandStack.pop()
+                } else {
+                    0 //TODO how can i find "this" index
+                }
+            }.reversed()
 
             val frame = Frame(classLoader, classFile, method, args.toTypedArray(), heap)
             return frame
@@ -387,7 +395,7 @@ class Frame(
             if (it < DescriptorUtil.argTypes(methodDescriptor).size + 1) {
                 operandStack.pop()
             } else {
-                null
+                heap.size - 1 //TODO how can I get "this" index
             }
         }.reversed()
 
@@ -453,7 +461,7 @@ class Frame(
         logger.info("OPCODE: new")
         val indexByte1 = inputStream.read()
         val indexByte2 = inputStream.read()
-        val index = indexByte1 * 255 + indexByte2
+        val index = indexByte1 * 255 + indexByte2 //TODO 256
         val cpClass = classFile.constantPools[index - 1] as ConstantPoolClass
         val cpClassNameUtf8 = classFile.constantPools[cpClass.nameIndex - 1] as ConstantPoolUtf8
         val className = cpClassNameUtf8.info.decodeToString()
@@ -470,6 +478,19 @@ class Frame(
         val indexByte1 = inputStream.read()
         val indexByte2 = inputStream.read()
         //TODO
+        return null
+    }
+
+    //0xc7
+    private fun ifnonnull(inputStream: MyByteArrayInputStream): Frame? {
+        logger.info("OPCODE: ifnonnull")
+        val instructionPos = inputStream.getPos() - 1
+        val branch1 = inputStream.read()
+        val branch2 = inputStream.read()
+        val offset = branch1 * 256 + branch2
+        if (operandStack.pop() == null) {
+            inputStream.setPos(instructionPos + offset)
+        }
         return null
     }
 }
