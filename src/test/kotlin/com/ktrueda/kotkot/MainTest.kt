@@ -50,6 +50,6 @@ class MainTest {
 //        val mcl = MyClassLoader.load(File("./target/src/"))
 //        val executor = Executor(mcl, "OtherClassKt")
 //        executor.runMain()
-        ClassFile.load(File("./target/src/kotlin/SynchronizedLazyImpl.class"))
+        ClassFile.load(File("./target/src/ExtendKt.class"))
     }
 }
