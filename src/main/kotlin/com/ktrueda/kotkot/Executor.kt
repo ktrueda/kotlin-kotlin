@@ -101,7 +101,7 @@ class Frame(
                 0xac -> {
                     return@run operandStack.pop()
                 }
-                0xb0 -> {
+                0xb0 -> { // areturn
                     return@run operandStack.pop()
                 }
                 0xb1 -> {
@@ -114,6 +114,7 @@ class Frame(
                 0xb6 -> invokevirtual(inputStream)
                 0xb7 -> invokespecial(inputStream)
                 0xb8 -> invokestatic(inputStream)
+                0xb9 -> invokeinterface(inputStream)
                 0xbb -> new(inputStream)
                 0xc0 -> checkcast(inputStream)
                 0xc7 -> ifnonnull(inputStream)
@@ -454,6 +455,20 @@ class Frame(
 
         val frame = Frame(classLoader, targetClassFile, targetMethod, args.toTypedArray(), heap)
         return frame
+    }
+
+    //TODO
+    //0xb9
+    private fun invokeinterface(inputStream: ByteArrayInputStream): Frame? {
+        logger.info("OPCODE: invokeinterface")
+        val indexByte1 = inputStream.read()
+        val indexByte2 = inputStream.read()
+        val count = inputStream.read()
+        inputStream.read()//0
+        val index = indexByte1 * 256 + indexByte2
+        logger.debug("index: $index count: $count")
+
+        return null
     }
 
     //0xbb
