@@ -400,6 +400,7 @@ class MyClassLoader private constructor(private val map: Map<String, ClassFile>)
                         "./target/src/ExtendKt.class",
                         "./target/src/SuperClass.class",
                         "./target/src/SubClass.class",
+                        "./target/src/Foo.class",
                         "./target/src/kotlin/LazyKt.class",
                         "./target/src/kotlin/LazyKt__LazyKt.class",
                         "./target/src/kotlin/LazyKt__LazyJVMKt.class",
